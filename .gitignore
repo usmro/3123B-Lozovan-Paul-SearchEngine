@@ -1,0 +1,11 @@
+engine
+a.out
+*.out
+*.o
+*.obj
+*.log
+log_valgrind.txt
+.vscode/
+.DS_Store
+*.swp
+*~
