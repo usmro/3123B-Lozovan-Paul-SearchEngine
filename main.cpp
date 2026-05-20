@@ -145,6 +145,9 @@ int main() {
             engine.incarcaDinFisierFizic(entry.path().string());
         }
     }
+    std::cout << "Optiuni de cautare:\n";
+    std::cout << "Cautare simpla:<cuvant>\n";
+    std::cout << "Cautare avansata: <cuvant1> < and || or > <cuvant2>\n";
 
     std::string linieInterogare;
     std::cin.clear();
