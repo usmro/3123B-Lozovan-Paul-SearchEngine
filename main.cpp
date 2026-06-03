@@ -31,7 +31,7 @@ public:
 class Logger : public Observer {
 public:
     void update(const std::string& cautare, bool gasit) override {
-        std::cout << "S-a efectuat o cautare pentru: '" << cautare 
+        std::cout << "\nS-a efectuat o cautare pentru: '" << cautare 
                   << "' | Status: " << (gasit ? "Gasit" : "Negasit") << std::endl;
     }
 };
@@ -81,11 +81,21 @@ private:
     std::vector<Document> colectie;
 
 public:
-    void adaugaDocument(const std::string& cale, const std::string& continut) {
-        int docId = colectie.size();
-        colectie.push_back(Document(cale, continut));
+    bool incarcaDinFisierFizic(const std::string& cale) {
+        if (!fs::exists(cale)) {
+            return false;
+        }
 
-        std::stringstream ss(continut);
+        std::ifstream file(cale);
+        if (!file.is_open()) return false;
+        
+        std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+
+        int docId = colectie.size();
+        colectie.push_back(Document(cale, text));
+
+        std::stringstream ss(text);
         std::string linie;
         int numarLinie = 1;
 
@@ -97,15 +107,9 @@ public:
             }
             numarLinie++;
         }
+        return true;
     }
 
-    void incarcaDinFisierFizic(const std::string& cale) {
-        std::ifstream file(cale);
-        if (!file.is_open()) return;
-        std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        file.close();
-        adaugaDocument(cale, text);
-    }
     std::set<std::pair<int, int>> cautaSimplu(const std::string& cuvant) {
         auto rezultate = indexulMeu.obtineLocatii(cuvant);
         notifica(cuvant, !rezultate.empty());
@@ -139,61 +143,100 @@ int main() {
     Logger logger;
     engine.ataseaza(&logger);
 
-    std::cout << "Se indexeaza fisierele text din folder\n";
-    for (const auto& entry : fs::directory_iterator("./")) {
-        if (entry.path().extension() == ".txt") {
-            engine.incarcaDinFisierFizic(entry.path().string());
-        }
-    }
-    std::cout << "Optiuni de cautare:\n";
-    std::cout << "Cautare simpla:<cuvant>\n";
-    std::cout << "Cautare avansata: <cuvant1> < and || or > <cuvant2>\n";
+    // Indexarea automată a fost eliminată complet de aici. 
+    // Sistemul pornește direct în meniu cu baza de date goală.
+    std::cout << "[Sistem] Motorul de cautare a pornit cu succes.\n";
 
-    std::string linieInterogare;
-    std::cin.clear();
-
+    std::string optiune;
     while (true) {
-        std::cout << "\nCautare: ";
-        std::getline(std::cin, linieInterogare);
+        std::cout << "\n========================================" << std::endl;
+        std::cout << "=                 MENIU                =" << std::endl;
+        std::cout << "========================================" << std::endl;
+        std::cout << "1. Indexare document text\n";
+        std::cout << "2. Motor de cautare\n";
+        std::cout << "3. Iesire\n";
+        std::cout << "Alege o optiune: ";
+        
+        std::getline(std::cin, optiune);
 
-        if (linieInterogare.empty()) break;
-
-        std::stringstream ss(linieInterogare);
-        std::vector<std::string> componente;
-        std::string bucata;
-
-        while (ss >> bucata) {
-            componente.push_back(bucata);
+        if (optiune == "3" || optiune == "iesire" || optiune == "exit") {
+            break;
         }
 
-        std::set<std::pair<int, int>> rezultate;
+        if (optiune == "1") {
+            std::string numeFisier;
+            std::cout << "Introdu numele sau calea documentului (ex: doc1.txt): ";
+            std::getline(std::cin, numeFisier);
 
-        if (componente.size() == 1) {
-            rezultate = engine.cautaSimplu(componente[0]);
-        } 
-        else if (componente.size() == 3) {
-            std::string c1 = componente[0];
-            std::string op = componente[1];
-            std::string c2 = componente[2];
-
-            if (op != "and" && op != "or") {
-                std::cout << "Operator invalid\n";
+            if (numeFisier.empty()) {
+                std::cout << "[Eroare] Numele fisierului nu poate fi gol.\n";
                 continue;
             }
-            rezultate = engine.cautaAvansat(c1, op, c2);
+
+            if (engine.incarcaDinFisierFizic(numeFisier)) {
+                std::cout << "[Succes] Fisierul '" << numeFisier << "' a fost indexat cu succes!\n";
+            } else {
+                std::cout << "[Eroare] Nu s-a putut deschide sau gasi fisierul '" << numeFisier << "'.\n";
+            }
+        } 
+        else if (optiune == "2") {
+            std::cout << "\n--- MOD CĂUTARE ACCESAT ---" << std::endl;
+            std::cout << "Sunt suportate doua formate:\n";
+            std::cout << "  - Cautare simpla:   <cuvant>\n";
+            std::cout << "  - Cautare avansata: <cuvant1> <and|or> <cuvant2>\n";
+            std::cout << "Scrie o linie goala (apasa Enter direct) pentru a te intoarce la meniu.\n";
+
+            while (true) {
+                std::string linieInterogare;
+                std::cout << "\nCautare: ";
+                std::getline(std::cin, linieInterogare);
+
+                if (linieInterogare.empty()) {
+                    std::cout << "Revenire la meniul principal...\n";
+                    break; 
+                }
+
+                std::stringstream ss(linieInterogare);
+                std::vector<std::string> componente;
+                std::string bucata;
+
+                while (ss >> bucata) {
+                    componente.push_back(bucata);
+                }
+
+                std::set<std::pair<int, int>> rezultate;
+
+                if (componente.size() == 1) {
+                    rezultate = engine.cautaSimplu(componente[0]);
+                } 
+                else if (componente.size() == 3) {
+                    std::string c1 = componente[0];
+                    std::string op = componente[1];
+                    std::string c2 = componente[2];
+
+                    if (op != "and" && op != "or") {
+                        std::cout << "[Eroare] Operator invalid. Foloseste doar 'and' sau 'or'.\n";
+                        continue;
+                    }
+                    rezultate = engine.cautaAvansat(c1, op, c2);
+                } 
+                else {
+                    std::cout << "[Eroare] Format gresit. Introdu un singur cuvant sau forma: cuvant1 and/or cuvant2\n";
+                    continue;
+                }
+
+                if (!rezultate.empty()) {
+                    for (const auto& p : rezultate) {
+                        std::cout << " -> Gasit in: " << engine.getCaleDocument(p.first) 
+                                  << " | Linia: " << p.second << std::endl;
+                    }
+                } else {
+                    std::cout << " -> Niciun rezultat gasit.\n";
+                }
+            }
         } 
         else {
-            std::cout << "Format gresit\n";
-            continue;
-        }
-
-        if (!rezultate.empty()) {
-            for (const auto& p : rezultate) {
-                std::cout << "Gasit in: " << engine.getCaleDocument(p.first) 
-                          << " | Linia: " << p.second << std::endl;
-            }
-        } else {
-            std::cout << " -> Niciun rezultat gasit.\n";
+            std::cout << "[Eroare] Optiune invalida!\n";
         }
     }
 
